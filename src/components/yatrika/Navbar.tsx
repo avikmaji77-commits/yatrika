@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Heart, User, Search, X } from "lucide-react";
+import { places } from "./Destination";
 import logo from "@/assets/logo.png";
 import { login, getWishlist } from "@/lib/api-service";
 import { scrollToSection } from "@/lib/travel-actions";
@@ -16,6 +17,8 @@ export function Navbar() {
     "wishlist",
   );
   const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userName, setUserName] = useState<string | null>(null);
@@ -43,6 +46,11 @@ export function Navbar() {
       } catch {
         setUserName(null);
       }
+    }
+
+    // Auto-open sign-in modal for first-time visitors (no stored user)
+    if (!storedUser) {
+      setIsSignInOpen(true);
     }
 
     setViewedCount(Number(window.localStorage.getItem("yatrika-destinations-viewed") || "0"));
@@ -145,6 +153,17 @@ export function Navbar() {
     setIsSignInOpen(false);
   };
 
+  const handleGuestSignIn = () => {
+    const guestName = "Guest";
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(USER_KEY, JSON.stringify({ name: guestName, token: "guest-token", guest: true }));
+    }
+    setUserName(guestName);
+    setEmail("");
+    setPassword("");
+    setIsSignInOpen(false);
+  };
+
   const openDrawer = (tab: typeof drawerTab) => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(FAVORITES_KEY);
@@ -157,6 +176,8 @@ export function Navbar() {
         }
       }
     }
+    // Ensure search modal is closed when opening the drawer
+    setIsSearchOpen(false);
     setDrawerTab(tab);
     setIsDrawerOpen(true);
   };
@@ -172,6 +193,44 @@ export function Navbar() {
     });
   };
 
+  const openSearch = () => {
+    // Close the right-side drawer if open so search appears on its own
+    setIsDrawerOpen(false);
+    // Restore previous search query if any so users see their last search
+    try {
+      if (typeof window !== "undefined") {
+        const last = window.localStorage.getItem("yatrika-last-search-query");
+        setSearchQuery(last ?? "");
+      }
+    } catch {
+      setSearchQuery("");
+    }
+    setIsSearchOpen(true);
+  };
+
+  const filteredPlaces = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return places.filter((p) => {
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.region.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      );
+    });
+  }, [searchQuery]);
+
+  // persist search query so it remains across reloads
+  React.useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("yatrika-last-search-query", searchQuery);
+      }
+    } catch {
+      // ignore
+    }
+  }, [searchQuery]);
+
   return (
     <header className="fixed left-0 right-0 top-4 z-50 px-4">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full border border-white/15 bg-white/10 px-5 py-3 shadow-lg backdrop-blur-xl">
@@ -181,20 +240,20 @@ export function Navbar() {
             alt="Yatrika"
             className="h-10 w-10 rounded-full border border-white/30 object-cover shadow-sm"
           />
-          <span className="font-semibold text-lg">YATRIKA</span>
+          <span className="font-bold text-lg text-black tracking-wider">YATRIKA</span>
         </Link>
 
-        <div className="hidden flex-1 items-center justify-center gap-8 text-sm font-medium text-gray-200 md:flex">
-          <a href="#planner" className="transition hover:text-white">
+        <div className="hidden flex-1 items-center justify-center gap-8 text-sm font-semibold text-slate-900 md:flex">
+          <a href="#planner" className="transition hover:text-sky-600">
             Explore
           </a>
-          <a href="#categories" className="transition hover:text-white">
+          <a href="#categories" className="transition hover:text-sky-600">
             Destinations
           </a>
-          <a href="#trending" className="transition hover:text-white">
+          <a href="#trending" className="transition hover:text-sky-600">
             Trending
           </a>
-          <a href="#map-explorer" className="transition hover:text-white">
+          <a href="#map-explorer" className="transition hover:text-sky-600">
             Map Explorer
           </a>
         </div>
@@ -216,7 +275,7 @@ export function Navbar() {
 
           <button
             type="button"
-            onClick={() => scrollToSection("planner")}
+            onClick={openSearch}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
             aria-label="Search"
           >
@@ -234,12 +293,12 @@ export function Navbar() {
         </div>
       </nav>
 
-      {isDrawerOpen && (
+      {isDrawerOpen && !isSearchOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="flex-1" onClick={() => setIsDrawerOpen(false)} />
-          <aside className="w-full max-w-md bg-white p-6 shadow-2xl border-l border-white/10 backdrop-blur-sm">
+          <aside className="w-full max-w-md relative p-6 shadow-2xl border-l border-white/20 bg-white/5 backdrop-blur-md text-white">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-lg font-semibold text-white">
                 {drawerTab === "wishlist"
                   ? "Wishlist"
                   : drawerTab === "profile"
@@ -251,7 +310,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setIsDrawerOpen(false)}
-                className="p-2 rounded-full text-slate-600 hover:bg-slate-100"
+                className="p-2 rounded-full text-white/80 hover:bg-white/10"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -260,25 +319,25 @@ export function Navbar() {
             <div className="mb-4 flex gap-2">
               <button
                 onClick={() => setDrawerTab("wishlist")}
-                className={`px-3 py-1 rounded-full ${drawerTab === "wishlist" ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`px-3 py-1 rounded-full ${drawerTab === "wishlist" ? "bg-sky-500 text-white" : "bg-white/5 text-white/80"}`}
               >
                 Wishlist
               </button>
               <button
                 onClick={() => setDrawerTab("profile")}
-                className={`px-3 py-1 rounded-full ${drawerTab === "profile" ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`px-3 py-1 rounded-full ${drawerTab === "profile" ? "bg-sky-500 text-white" : "bg-white/5 text-white/80"}`}
               >
                 Profile
               </button>
               <button
                 onClick={() => setDrawerTab("settings")}
-                className={`px-3 py-1 rounded-full ${drawerTab === "settings" ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`px-3 py-1 rounded-full ${drawerTab === "settings" ? "bg-sky-500 text-white" : "bg-white/5 text-white/80"}`}
               >
                 Settings
               </button>
               <button
                 onClick={() => setDrawerTab("stats")}
-                className={`px-3 py-1 rounded-full ${drawerTab === "stats" ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`px-3 py-1 rounded-full ${drawerTab === "stats" ? "bg-sky-500 text-white" : "bg-white/5 text-white/80"}`}
               >
                 Analytics
               </button>
@@ -288,18 +347,18 @@ export function Navbar() {
               {drawerTab === "wishlist" && (
                 <div className="space-y-3">
                   {favorites.length === 0 ? (
-                    <p className="text-slate-600">Your wishlist is empty</p>
+                    <p className="text-white/80">Your wishlist is empty</p>
                   ) : (
                     favorites.map((item) => (
                       <div
                         key={item}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"
+                        className="flex items-center justify-between gap-3 rounded-lg bg-white/5 p-3"
                       >
-                        <p className="font-medium text-slate-900">{item}</p>
+                        <p className="font-medium text-white">{item}</p>
                         <button
                           type="button"
                           onClick={() => removeFavorite(item)}
-                          className="rounded-full px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                          className="rounded-full px-3 py-1 text-xs font-semibold text-rose-400 hover:bg-rose-800/10"
                         >
                           Remove
                         </button>
@@ -308,6 +367,65 @@ export function Navbar() {
                   )}
                 </div>
               )}
+
+                {isSearchOpen && (
+                  <div className="fixed inset-0 z-60 flex items-start justify-center pt-24">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSearchOpen(false)} />
+                    <div className="relative w-full max-w-3xl rounded-2xl bg-white/6 p-6 shadow-2xl backdrop-blur-md border border-white/20 text-white">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold">Search places</h2>
+                        <button
+                          type="button"
+                          onClick={() => setIsSearchOpen(false)}
+                          className="rounded-full p-2 text-white/80 hover:bg-white/10"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <div className="mb-4">
+                        <input
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search places, regions or categories"
+                          className="w-full rounded-full border border-white/20 bg-white/5 px-4 py-3 text-sm placeholder:text-white/60 text-white outline-none focus:ring-2 focus:ring-sky-300"
+                        />
+                      </div>
+
+                      <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                        {searchQuery.trim() === "" ? (
+                          <p className="text-white/70">Type a place name, region, or category to search.</p>
+                        ) : filteredPlaces.length === 0 ? (
+                          <p className="text-white/70">No results found.</p>
+                        ) : (
+                          filteredPlaces.map((p) => (
+                            <div
+                              key={p.name}
+                              onClick={() => {
+                                try {
+                                  if (typeof window !== "undefined") {
+                                    window.localStorage.setItem("yatrika-last-selected", p.name);
+                                  }
+                                } catch {}
+                                setIsSearchOpen(false);
+                              }}
+                              className="cursor-pointer flex items-center gap-4 rounded-lg bg-white/5 p-3 hover:bg-white/10"
+                            >
+                              <img src={p.img} alt={p.name} className="h-16 w-24 rounded-md object-cover" />
+                              <div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <h3 className="font-medium text-white">{p.name}</h3>
+                                  <span className="text-sm text-white/80">{p.rating} ★</span>
+                                </div>
+                                <p className="text-sm text-white/80">{p.region} • {p.category}</p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               {drawerTab === "profile" && (
                 <div>
@@ -366,51 +484,65 @@ export function Navbar() {
       )}
 
       {isSignInOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSignInOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white/10 p-6 shadow-2xl backdrop-blur-md border border-white/20 ring-1 ring-white/5">
             <div className="flex items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-semibold text-slate-900">Sign In</h2>
-              <button
-                type="button"
-                onClick={() => setIsSignInOpen(false)}
-                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+                <h2 className="text-2xl font-semibold text-white">Sign In</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsSignInOpen(false)}
+                  className="rounded-full p-2 text-white/80 hover:bg-white/10"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             <form onSubmit={handleSignInSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                  placeholder="you@domain.com"
+                  className="w-full rounded-full border border-white/25 bg-white/5 px-4 py-3 text-sm placeholder:text-white/60 text-white outline-none shadow-inner focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                  placeholder="Enter your password"
+                  className="w-full rounded-full border border-white/25 bg-white/5 px-4 py-3 text-sm placeholder:text-white/60 text-white outline-none shadow-inner focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                   required
                 />
               </div>
-              <div className="flex items-center gap-2 pt-4">
+              <div className="pt-4">
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-sky-500 hover:bg-sky-400 px-4 py-2 text-sm font-semibold text-white transition"
+                  className="w-full rounded-full bg-sky-500 hover:bg-sky-400 px-4 py-2 text-sm font-semibold text-white transition"
                 >
                   Sign In
                 </button>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleGuestSignIn}
+                  className="flex-1 rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 hover:bg-white/10 transition"
+                >
+                  Continue as Guest
+                </button>
+
                 {userName && (
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="flex-1 rounded-lg border border-slate-200 hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition"
+                    className="flex-1 rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 hover:bg-white/10 transition"
                   >
                     Sign Out
                   </button>

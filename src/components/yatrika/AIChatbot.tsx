@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { chat } from "@/lib/api-service";
 import { MessageCircle, X, Send, Sparkles, User, Bot } from "lucide-react";
 import type { ChatOpenDetail } from "@/lib/travel-actions";
+import { places } from "./Destination";
 
 interface Message {
   role: "user" | "assistant";
@@ -33,15 +34,55 @@ export function AIChatbot() {
 
   const buildLocalReply = (message: string) => {
     const lower = message.toLowerCase();
-    const mood = lower.includes("romantic")
-      ? "romantic stays, sunset viewpoints, and unhurried dinners"
-      : lower.includes("advent")
-        ? "trail time, local guides, and one rest buffer"
-        : lower.includes("cafe")
-          ? "slow mornings, view cafes, and short scenic transfers"
-          : "balanced sightseeing, local food, and flexible downtime";
 
-    return `Here is a practical starting plan: choose 2-3 destinations, keep ${mood}, set one fixed travel day at the beginning and end, then save favorites so your shortlist stays visible. Tell me your budget and number of days, and I can shape it tighter.`;
+    // Try to detect a region or place name mentioned
+    const regionMatch = places.find((p) => lower.includes(p.name.toLowerCase()) || lower.includes(p.region.toLowerCase()));
+    const categoryMatch = places.find((p) => lower.includes(p.category.toLowerCase()));
+
+    // Try to detect mood / intent
+    const isRomantic = lower.includes("romantic") || lower.includes("couple");
+    const isAdventure = lower.includes("advent") || lower.includes("hike") || lower.includes("trek");
+    const isRelax = lower.includes("relax") || lower.includes("beach") || lower.includes("spa");
+
+    // Build suggestion list
+    let candidates = places.slice();
+    if (regionMatch) {
+      candidates = places.filter((p) => p.region === regionMatch.region || p.name === regionMatch.name);
+    } else if (categoryMatch) {
+      candidates = places.filter((p) => p.category === categoryMatch.category);
+    } else if (isRomantic) {
+      candidates = places.filter((p) => p.crowd === "Peaceful" || p.category === "Hidden Gems");
+    } else if (isAdventure) {
+      candidates = places.filter((p) => p.category === "Hidden Gems" || p.category === "Trending");
+    } else if (isRelax) {
+      candidates = places.filter((p) => p.category === "Recently Popular" || p.crowd === "Peaceful");
+    }
+
+    // Fallback to top-rated
+    if (!candidates || candidates.length === 0) {
+      candidates = places.slice();
+    }
+
+    // Sort by rating desc
+    candidates = candidates.sort((a, b) => b.rating - a.rating).slice(0, 5);
+
+    // Compose reply
+    const header = regionMatch
+      ? `I found these top suggestions around ${regionMatch.region}:`
+      : isRomantic
+        ? "Romantic trip ideas to consider:"
+        : isAdventure
+          ? "Adventure-friendly picks:"
+          : isRelax
+            ? "Relaxing getaway suggestions:"
+            : "Here are some great places to consider:";
+
+    const list = candidates
+      .slice(0, 3)
+      .map((p) => `• ${p.name} (${p.region}) — ${p.rating}★ — ${p.category}`)
+      .join("\n");
+
+    return `${header}\n${list}\n\nTell me your budget and number of days and I can build a tighter plan.`;
   };
 
   const sendMessage = async (content: string) => {

@@ -1,4 +1,7 @@
-from .app_complete import app, FLASK_DEBUG, logger
+try:
+    from .app_complete import app, FLASK_DEBUG, logger
+except ImportError:
+    from app_complete import app, FLASK_DEBUG, logger
 
 if __name__ == '__main__':
     logger.info('Starting Yatrika backend...')

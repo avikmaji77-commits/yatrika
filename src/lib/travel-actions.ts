@@ -4,6 +4,7 @@ export type PlannerSearchDetail = {
   guests?: string;
   date?: string;
   source?: string;
+  budget?: string;
 };
 
 export type ChatOpenDetail = {

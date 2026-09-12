@@ -1,54 +1,34 @@
 import React, { useEffect, useState } from "react";
 import heroImg from "@/assets/hero.png";
-import { Globe, Calendar, User, Plane, ChevronDown } from "lucide-react";
-import { getDestinations } from "@/lib/api-service";
+import { Globe, User, Plane, SlidersHorizontal } from "lucide-react";
 import type { PlannerSearchDetail } from "@/lib/travel-actions";
+import { useNavigate } from "@tanstack/react-router";
+import { GlassSelect } from "@/components/yatrika/GlassSelect";
+import { GlassDatePicker } from "@/components/yatrika/GlassDatePicker";
 
 const regions = ["Asia", "Europe", "Africa", "North America", "South America", "Australia"];
 const guestsOptions = ["Solo", "Couple", "Family", "Friends"];
+const regionOptions = regions.map((item) => ({ value: item, label: item }));
+const guestSelectOptions = guestsOptions.map((item) => ({ value: item, label: item }));
 
 export function Hero() {
+  const navigate = useNavigate();
   const [selectedRegion, setSelectedRegion] = useState("Asia");
   const [selectedDate, setSelectedDate] = useState("2026-06-01");
   const [selectedGuests, setSelectedGuests] = useState("Couple");
-  const [discoverResults, setDiscoverResults] = useState<any[]>([]);
-  const [discoverLoading, setDiscoverLoading] = useState(false);
-  const [discoverError, setDiscoverError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  const runSearch = async (overrides: PlannerSearchDetail = {}) => {
-    const region = overrides.region ?? selectedRegion;
-    const guests = overrides.guests ?? selectedGuests;
-    const category = overrides.category;
-
-    setHasSearched(true);
-    setDiscoverError(null);
-    setDiscoverLoading(true);
-    setDiscoverResults([]);
-
-    try {
-      const response = await getDestinations({
-        limit: 6,
-        search: category ? `${category} ${region}` : `${region} ${guests}`,
-      });
-      const destinations = Array.isArray(response) ? response : (response.data ?? []);
-
-      if (destinations.length === 0) {
-        const fallback = await getDestinations({ limit: 6 });
-        setDiscoverResults(Array.isArray(fallback) ? fallback : (fallback.data ?? []));
-      } else {
-        setDiscoverResults(destinations);
-      }
-    } catch (error) {
-      setDiscoverError("Unable to find unique destinations right now. Please try again.");
-    } finally {
-      setDiscoverLoading(false);
-    }
-  };
+  const [selectedBudget, setSelectedBudget] = useState("All");
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    runSearch();
+    navigate({
+      to: "/discover",
+      search: {
+        region: selectedRegion,
+        date: selectedDate,
+        guests: selectedGuests,
+        budget: selectedBudget,
+      },
+    });
   };
 
   useEffect(() => {
@@ -56,15 +36,32 @@ export function Hero() {
 
     const handlePlannerSearch = (event: Event) => {
       const detail = (event as CustomEvent<PlannerSearchDetail>).detail ?? {};
+      const targetRegion = detail.region ?? selectedRegion;
+      const targetGuests = detail.guests ?? selectedGuests;
+      const targetDate = detail.date ?? selectedDate;
+      const targetBudget = detail.budget ?? selectedBudget;
+      const targetCategory = detail.category ?? "";
+
       if (detail.region) setSelectedRegion(detail.region);
       if (detail.guests) setSelectedGuests(detail.guests);
       if (detail.date) setSelectedDate(detail.date);
-      runSearch(detail);
+      if (detail.budget) setSelectedBudget(detail.budget);
+
+      navigate({
+        to: "/discover",
+        search: {
+          region: targetRegion,
+          date: targetDate,
+          guests: targetGuests,
+          budget: targetBudget,
+          category: targetCategory || undefined,
+        },
+      });
     };
 
     window.addEventListener("yatrika:planner-search", handlePlannerSearch);
     return () => window.removeEventListener("yatrika:planner-search", handlePlannerSearch);
-  }, [selectedRegion, selectedGuests]);
+  }, [selectedRegion, selectedGuests, selectedDate, selectedBudget]);
 
   return (
     <section id="planner" className="relative min-h-screen overflow-hidden font-sans">
@@ -105,84 +102,70 @@ export function Hero() {
             </div>
           </div>
 
+          {/* Corner Budget Filter Widget */}
+          <div className="self-end flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full shadow-lg text-xs z-30 select-none -mb-1 md:translate-y-1">
+            <span className="text-gray-300 font-medium flex items-center gap-1">
+              <SlidersHorizontal size={12} />
+              Budget:
+            </span>
+            <div className="flex gap-1">
+              {["All", "Low", "Medium", "High"].map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setSelectedBudget(b)}
+                  className={`px-2.5 py-0.5 rounded-full transition-all duration-200 font-semibold cursor-pointer ${
+                    selectedBudget === b
+                      ? "bg-sky-500 text-white shadow-sm"
+                      : "text-gray-200 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="relative z-20 w-full bg-white/15 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/25 flex flex-col md:flex-row items-center p-2 gap-1 md:gap-0 select-none">
-            <div className="relative w-full md:w-1/3 flex items-center justify-between px-4 py-2.5 hover:bg-white/10 rounded-xl transition-all duration-200 group">
-              <div className="flex items-center gap-3 w-full">
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white backdrop-blur-sm shrink-0">
-                  <Globe size={16} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-200/80 mb-0.5">
-                    Continent
-                  </span>
-                  <select
-                    value={selectedRegion}
-                    onChange={(e) => setSelectedRegion(e.target.value)}
-                    className="block w-full bg-transparent text-sm font-semibold text-white outline-none cursor-pointer appearance-none pr-4"
-                  >
-                    {regions.map((item) => (
-                      <option key={item} value={item} className="text-slate-900">
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <ChevronDown
-                size={16}
-                className="text-gray-300 group-hover:text-white pointer-events-none absolute right-4"
+            <div className="w-full md:w-1/3">
+              <GlassSelect
+                value={selectedRegion}
+                onValueChange={setSelectedRegion}
+                options={regionOptions}
+                label="Continent"
+                icon={Globe}
+                triggerClassName="border-transparent bg-transparent px-4 py-2.5 shadow-none hover:bg-white/10 hover:border-transparent focus-visible:border-white/30 focus-visible:ring-white/20"
+                iconClassName="bg-white/20 text-white"
+                labelClassName="text-gray-200/80"
               />
             </div>
 
             <div className="hidden md:block w-px h-8 bg-white/20" />
 
-            <div className="relative w-full md:w-1/3 flex items-center justify-between px-4 py-2.5 hover:bg-white/10 rounded-xl transition-all duration-200 group">
-              <div className="flex items-center gap-3 w-full">
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white backdrop-blur-sm shrink-0">
-                  <Calendar size={16} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-200/80 mb-0.5">
-                    When
-                  </span>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="block w-full bg-transparent text-sm font-semibold text-white outline-none cursor-pointer dark"
-                  />
-                </div>
-              </div>
+            <div className="w-full md:w-1/3">
+              <GlassDatePicker
+                value={selectedDate}
+                onValueChange={setSelectedDate}
+                label="When"
+                triggerClassName="border-transparent bg-transparent px-4 py-2.5 shadow-none hover:bg-white/10 hover:border-transparent focus-visible:border-white/30 focus-visible:ring-white/20"
+                iconClassName="bg-white/20 text-white"
+                labelClassName="text-gray-200/80"
+              />
             </div>
 
             <div className="hidden md:block w-px h-8 bg-white/20" />
 
             <div className="w-full md:w-1/3 flex flex-col sm:flex-row items-center justify-between pl-4 pr-1.5 py-1 sm:py-0 gap-2 sm:gap-0">
-              <div className="relative w-full sm:w-auto flex items-center justify-between gap-3 hover:bg-white/10 sm:hover:bg-transparent rounded-xl sm:rounded-none py-1.5 sm:py-0 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white backdrop-blur-sm shrink-0">
-                    <User size={16} strokeWidth={2} />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-200/80 mb-0.5">
-                      Guests
-                    </span>
-                    <select
-                      value={selectedGuests}
-                      onChange={(e) => setSelectedGuests(e.target.value)}
-                      className="block w-full bg-transparent text-sm font-semibold text-white outline-none cursor-pointer appearance-none pr-4"
-                    >
-                      {guestsOptions.map((item) => (
-                        <option key={item} value={item} className="text-slate-900">
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className="text-gray-300 group-hover:text-white pointer-events-none absolute right-2 sm:static sm:ml-1"
+              <div className="w-full sm:w-auto sm:min-w-44">
+                <GlassSelect
+                  value={selectedGuests}
+                  onValueChange={setSelectedGuests}
+                  options={guestSelectOptions}
+                  label="Guests"
+                  icon={User}
+                  triggerClassName="border-transparent bg-transparent px-0 py-1.5 shadow-none hover:bg-white/10 sm:hover:bg-transparent hover:border-transparent focus-visible:border-white/30 focus-visible:ring-white/20"
+                  iconClassName="bg-white/20 text-white"
+                  labelClassName="text-gray-200/80"
                 />
               </div>
 
@@ -196,47 +179,6 @@ export function Hero() {
             </div>
           </div>
         </form>
-
-        <div className="mt-8 rounded-3xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-widest text-slate-400">Search results</p>
-              <h3 className="text-2xl font-semibold text-white">Discover matching destinations</h3>
-            </div>
-            {discoverLoading && <span className="text-sm text-sky-200">Searching…</span>}
-          </div>
-
-          {discoverError ? (
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {discoverError}
-            </div>
-          ) : hasSearched && discoverResults.length === 0 && !discoverLoading ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 p-6 text-center text-slate-300">
-              No results found for your discovery preferences. Try a different region or guest type.
-            </div>
-          ) : (
-            hasSearched && (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {discoverResults.map((item) => (
-                  <div
-                    key={item._id || item.name}
-                    className="rounded-3xl bg-slate-950/70 p-4 text-white shadow-xl"
-                  >
-                    <h4 className="font-semibold">{item.name}</h4>
-                    <p className="text-sm text-slate-300 mb-2">{item.location || item.region}</p>
-                    <p className="text-sm text-slate-400 truncate">
-                      {item.description || item.category}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                      <span>{item.budget || "Budget info"}</span>
-                      <span>⭐ {item.rating ?? "-"}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-        </div>
       </div>
     </section>
   );
